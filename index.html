@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading Statistics Merger (Final)</title>
+    <title>Trading Statistics Merger (Date Sorted)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -20,8 +20,8 @@
 
     <div class="max-w-4xl mx-auto p-8">
         <div class="text-center mb-10">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">📊 통계 엑셀 병합기 (최종)</h1>
-            <p class="text-gray-500">손절 요약 전용, 종료일 나열 기능이 포함되었습니다.</p>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">📊 통계 엑셀 병합기 (날짜 정렬)</h1>
+            <p class="text-gray-500">손절일 오름차순 정렬 기능이 추가되었습니다.</p>
         </div>
 
         <div class="bg-white rounded-xl shadow-lg p-8">
@@ -234,15 +234,17 @@
                             }
                         }
                     }
-                    // 개별 시트 생성 부분 제거됨 (요청사항 1)
                 }
 
-                // --- 요약 데이터 정제 및 정렬 ---
+                // --- 요약 데이터 정제, 날짜 정렬 및 분류 ---
                 let allSummaryData = [];
                 let maxDatesCount = 0;
 
                 summaryMap.forEach((data, name) => {
                     if (data.count > 0) { // 0인 것 제외
+                        // *** 날짜 오름차순 정렬 (빠른 날짜 -> 느린 날짜) ***
+                        data.dates.sort();
+
                         if (data.dates.length > maxDatesCount) maxDatesCount = data.dates.length;
                         allSummaryData.push({
                             name: name,
@@ -253,16 +255,14 @@
                     }
                 });
 
-                // 분류 및 내림차순 정렬
+                // 분류 및 내림차순 정렬 (손절 횟수 기준)
                 const minusGroup = allSummaryData.filter(d => d.type === 'minus').sort((a, b) => b.count - a.count);
                 const plusGroup = allSummaryData.filter(d => d.type === 'plus').sort((a, b) => b.count - a.count);
                 const otherGroup = allSummaryData.filter(d => d.type === 'other').sort((a, b) => b.count - a.count);
 
                 // --- 헤더에 날짜 컬럼 추가 (D열 부터) ---
-                // D열은 인덱스 4 (A=1, B=2, C=3, D=4)
                 for(let i=0; i<maxDatesCount; i++) {
-                    summarySheet.getColumn(4 + i).width = 15; // D열부터 너비 15 설정 (요청사항 3)
-                    // 헤더 텍스트는 굳이 필요 없으면 생략하거나
+                    summarySheet.getColumn(4 + i).width = 15; // D열부터 너비 15 설정
                     summarySheet.getCell(1, 4 + i).value = `손절일 ${i+1}`;
                     summarySheet.getCell(1, 4 + i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
                     summarySheet.getCell(1, 4 + i).font = { bold: true };
@@ -343,9 +343,9 @@
 
                 const buffer = await workbook.xlsx.writeBuffer();
                 const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                saveAs(blob, '손절요약_최종.xlsx');
+                saveAs(blob, '손절요약_날짜정렬.xlsx');
                 
-                alert('완료되었습니다! (단일 시트 생성)');
+                alert('완료되었습니다! (손절일 오름차순 정렬 완료)');
 
             } catch (err) {
                 console.error(err);
