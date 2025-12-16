@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading Statistics Merger (v2.0)</title>
+    <title>Trading Statistics Merger (Final)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -20,8 +20,8 @@
 
     <div class="max-w-4xl mx-auto p-8">
         <div class="text-center mb-10">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">📊 통계 엑셀 병합기 v2.0</h1>
-            <p class="text-gray-500">중복 병합, 0회 제외, 내림차순 정렬 기능이 적용되었습니다.</p>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">📊 통계 엑셀 병합기 (최종)</h1>
+            <p class="text-gray-500">손절 요약 전용, 종료일 나열 기능이 포함되었습니다.</p>
         </div>
 
         <div class="bg-white rounded-xl shadow-lg p-8">
@@ -46,7 +46,7 @@
 
             <div class="mt-8 pt-6 border-t border-gray-100 flex justify-end">
                 <button id="process-btn" onclick="processFiles()" disabled class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
-                    <span id="btn-text">엑셀 병합 및 다운로드</span>
+                    <span id="btn-text">요약 파일 생성 및 다운로드</span>
                     <svg id="loading-spinner" class="animate-spin ml-2 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -54,7 +54,7 @@
                 </button>
             </div>
         </div>
-        <p class="text-center text-xs text-gray-400 mt-6">&copy; 2025 Trading Tool. All processing happens locally.</p>
+        <p class="text-center text-xs text-gray-400 mt-6">&copy; 2025 Trading Tool. Processed locally.</p>
     </div>
 
     <script>
@@ -130,17 +130,15 @@
             try {
                 const workbook = new ExcelJS.Workbook();
                 const summarySheet = workbook.addWorksheet('손절요약시트');
+                
+                // 기본 컬럼 설정 (A: 이름, B: 횟수, C: 공백)
                 summarySheet.columns = [
                     { header: 'Group Name', key: 'name', width: 30 },
                     { header: '손절횟수', key: 'lossCount', width: 15 },
+                    { header: '', key: 'spacer', width: 2 } // C열은 공백
                 ];
-                
-                const headerRow = summarySheet.getRow(1);
-                headerRow.font = { bold: true };
-                headerRow.alignment = { horizontal: 'center' };
-                headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
 
-                // 중복 병합을 위한 Map: Key=GroupName, Value=Count
+                // 중복 병합을 위한 Map: Key=GroupName, Value={ count: number, dates: string[] }
                 let summaryMap = new Map();
 
                 for (let i = 0; i < selectedFiles.length; i++) {
@@ -172,7 +170,9 @@
                     let headerRowIndex = -1;
                     let nameColIdx = 0;
                     let lossColIdx = -1;
+                    let endDateColIdx = -1;
 
+                    // 헤더 찾기
                     for (let r = 0; r < rows.length; r++) {
                         const row = rows[r];
                         for(let c = 0; c < row.length; c++) {
@@ -180,11 +180,11 @@
                             if (cellVal === "Group Name") {
                                 headerRowIndex = r;
                                 nameColIdx = c;
+                                // 같은 줄에서 "손절횟수"와 "종료일" 찾기
                                 for(let k = 0; k < row.length; k++) {
-                                    if (String(row[k] || "").trim() === "손절횟수") {
-                                        lossColIdx = k;
-                                        break;
-                                    }
+                                    const headerVal = String(row[k] || "").trim();
+                                    if (headerVal === "손절횟수") lossColIdx = k;
+                                    if (headerVal === "종료일") endDateColIdx = k;
                                 }
                                 break;
                             }
@@ -200,6 +200,7 @@
                             
                             const rawName = row[nameColIdx];
                             const rawLoss = row[lossColIdx];
+                            const rawDate = endDateColIdx !== -1 ? row[endDateColIdx] : "";
 
                             if (rawName) {
                                 let nameStr = String(rawName).trim();
@@ -212,30 +213,42 @@
                                 }
 
                                 if (nameStr) {
-                                    // Map에 병합 (기존 값 + 현재 값)
-                                    const currentCount = summaryMap.get(nameStr) || 0;
-                                    summaryMap.set(nameStr, currentCount + lossVal);
+                                    if (!summaryMap.has(nameStr)) {
+                                        summaryMap.set(nameStr, { count: 0, dates: [], type: '' });
+                                    }
+                                    
+                                    const entry = summaryMap.get(nameStr);
+                                    entry.count += lossVal;
+                                    entry.type = nameStr.includes('-') ? 'minus' : (nameStr.includes('+') ? 'plus' : 'other');
+
+                                    // 손절이 발생한 행(row)이라면 날짜 추가
+                                    if (lossVal > 0 && rawDate) {
+                                        let dateStr = String(rawDate).trim();
+                                        // 엑셀 날짜 객체 처리 (필요시)
+                                        if (typeof rawDate === 'object' && rawDate instanceof Date) {
+                                            dateStr = rawDate.toISOString().split('T')[0];
+                                        }
+                                        entry.dates.push(dateStr);
+                                    }
                                 }
                             }
                         }
                     }
-
-                    // --- 개별 시트 복사 ---
-                    let sheetName = file.name.replace(/\.[^/.]+$/, "").substring(0, 30);
-                    if (workbook.getWorksheet(sheetName)) sheetName = `${sheetName}_${i}`;
-                    const rawSheet = workbook.addWorksheet(sheetName);
-                    rows.forEach(r => rawSheet.addRow(r));
+                    // 개별 시트 생성 부분 제거됨 (요청사항 1)
                 }
 
                 // --- 요약 데이터 정제 및 정렬 ---
-                // Map -> Array 변환 및 필터링 (0회 제외)
                 let allSummaryData = [];
-                summaryMap.forEach((count, name) => {
-                    if (count > 0) { // 0인 것 제외
+                let maxDatesCount = 0;
+
+                summaryMap.forEach((data, name) => {
+                    if (data.count > 0) { // 0인 것 제외
+                        if (data.dates.length > maxDatesCount) maxDatesCount = data.dates.length;
                         allSummaryData.push({
                             name: name,
-                            count: count,
-                            type: name.includes('-') ? 'minus' : (name.includes('+') ? 'plus' : 'other')
+                            count: data.count,
+                            dates: data.dates,
+                            type: data.type
                         });
                     }
                 });
@@ -245,50 +258,78 @@
                 const plusGroup = allSummaryData.filter(d => d.type === 'plus').sort((a, b) => b.count - a.count);
                 const otherGroup = allSummaryData.filter(d => d.type === 'other').sort((a, b) => b.count - a.count);
 
-                // 시트 쓰기
-                let currentRow = 2;
+                // --- 헤더에 날짜 컬럼 추가 (D열 부터) ---
+                // D열은 인덱스 4 (A=1, B=2, C=3, D=4)
+                for(let i=0; i<maxDatesCount; i++) {
+                    summarySheet.getColumn(4 + i).width = 15; // D열부터 너비 15 설정 (요청사항 3)
+                    // 헤더 텍스트는 굳이 필요 없으면 생략하거나
+                    summarySheet.getCell(1, 4 + i).value = `손절일 ${i+1}`;
+                    summarySheet.getCell(1, 4 + i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
+                    summarySheet.getCell(1, 4 + i).font = { bold: true };
+                    summarySheet.getCell(1, 4 + i).alignment = { horizontal: 'center' };
+                    summarySheet.getCell(1, 4 + i).border = { bottom: {style:'thin'} };
+                }
 
-                // 1. Minus Group (-)
-                const minusStart = currentRow;
-                minusGroup.forEach(d => { summarySheet.addRow([d.name, d.count]); currentRow++; });
-                const minusEnd = currentRow - 1;
+                // 헤더 스타일 적용 (A, B)
+                const headerRow = summarySheet.getRow(1);
+                headerRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } }; // A
+                headerRow.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } }; // B
+                headerRow.font = { bold: true };
+                headerRow.alignment = { horizontal: 'center' };
 
-                // 2. Plus Group (+)
-                const plusStart = currentRow;
-                plusGroup.forEach(d => { summarySheet.addRow([d.name, d.count]); currentRow++; });
-                const plusEnd = currentRow - 1;
 
-                // 3. Others
-                otherGroup.forEach(d => { summarySheet.addRow([d.name, d.count]); currentRow++; });
+                // --- 데이터 쓰기 함수 ---
+                const writeGroup = (groupData, colorCode) => {
+                    groupData.forEach(d => {
+                        // [Name, Count, Empty, Date1, Date2, ...]
+                        const rowData = [d.name, d.count, '', ...d.dates];
+                        const newRow = summarySheet.addRow(rowData);
+                        
+                        // 이름 열 색상
+                        newRow.getCell(1).font = { color: { argb: colorCode } };
+                    });
+                };
 
-                // 조건부 서식 (Data Bar)
-                if (minusStart <= minusEnd) {
+                // 그룹별 쓰기
+                let currentRowIdx = 2; // 1은 헤더
+                const minusStart = currentRowIdx;
+                writeGroup(minusGroup, 'FFCC0000'); // Red Text
+                const minusEnd = currentRowIdx + minusGroup.length - 1;
+                currentRowIdx += minusGroup.length;
+
+                const plusStart = currentRowIdx;
+                writeGroup(plusGroup, 'FF006600'); // Green Text
+                const plusEnd = currentRowIdx + plusGroup.length - 1;
+                currentRowIdx += plusGroup.length;
+
+                writeGroup(otherGroup, 'FF000000'); // Black
+
+                // 조건부 서식 (Data Bar) - B열
+                if (minusGroup.length > 0) {
                     summarySheet.addConditionalFormatting({
                         ref: `B${minusStart}:B${minusEnd}`,
                         rules: [{
                             type: 'dataBar',
                             cfvo: [{ type: 'min', value: 0 }, { type: 'max' }],
-                            color: { argb: 'FFFF6B6B' }, // Red
+                            color: { argb: 'FFFF6B6B' }, // Red Bar
                             showValue: true, gradient: true
                         }]
                     });
-                    for(let r=minusStart; r<=minusEnd; r++) summarySheet.getCell(`A${r}`).font = { color: { argb: 'FFCC0000' } };
                 }
 
-                if (plusStart <= plusEnd) {
+                if (plusGroup.length > 0) {
                     summarySheet.addConditionalFormatting({
                         ref: `B${plusStart}:B${plusEnd}`,
                         rules: [{
                             type: 'dataBar',
                             cfvo: [{ type: 'min', value: 0 }, { type: 'max' }],
-                            color: { argb: 'FF6BFF8E' }, // Green
+                            color: { argb: 'FF6BFF8E' }, // Green Bar
                             showValue: true, gradient: true
                         }]
                     });
-                    for(let r=plusStart; r<=plusEnd; r++) summarySheet.getCell(`A${r}`).font = { color: { argb: 'FF006600' } };
                 }
 
-                // 테두리
+                // 전체 테두리
                 summarySheet.eachRow((row) => {
                     row.eachCell((cell) => {
                         cell.border = {
@@ -302,16 +343,16 @@
 
                 const buffer = await workbook.xlsx.writeBuffer();
                 const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                saveAs(blob, '통계_종합_결과_v2.xlsx');
+                saveAs(blob, '손절요약_최종.xlsx');
                 
-                alert('완료되었습니다! (0회 제외, 중복 병합 완료)');
+                alert('완료되었습니다! (단일 시트 생성)');
 
             } catch (err) {
                 console.error(err);
                 alert('오류 발생: ' + err.message);
             } finally {
                 processBtn.disabled = false;
-                btnText.textContent = "엑셀 병합 및 다운로드";
+                btnText.textContent = "요약 파일 생성 및 다운로드";
                 loadingSpinner.classList.add('hidden');
             }
         }
