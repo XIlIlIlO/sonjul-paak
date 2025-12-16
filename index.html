@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading Statistics Merger (Fixed)</title>
+    <title>Trading Statistics Merger (v2.0)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -20,8 +20,8 @@
 
     <div class="max-w-4xl mx-auto p-8">
         <div class="text-center mb-10">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">📊 통계 엑셀 병합기 (수정버전)</h1>
-            <p class="text-gray-500">엑셀(.xlsx)과 CSV 파일을 모두 정확하게 인식하여 병합합니다.</p>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">📊 통계 엑셀 병합기 v2.0</h1>
+            <p class="text-gray-500">중복 병합, 0회 제외, 내림차순 정렬 기능이 적용되었습니다.</p>
         </div>
 
         <div class="bg-white rounded-xl shadow-lg p-8">
@@ -103,7 +103,6 @@
             }
         }
 
-        // 파일 읽기 유틸리티
         function readFileAsArrayBuffer(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -141,45 +140,39 @@
                 headerRow.alignment = { horizontal: 'center' };
                 headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
 
-                let allSummaryData = [];
+                // 중복 병합을 위한 Map: Key=GroupName, Value=Count
+                let summaryMap = new Map();
 
                 for (let i = 0; i < selectedFiles.length; i++) {
                     const file = selectedFiles[i];
                     let rows = [];
 
-                    // 파일 타입에 따른 처리 분기
                     if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-                        // 엑셀 파일 처리
                         const buffer = await readFileAsArrayBuffer(file);
                         const tempWorkbook = new ExcelJS.Workbook();
                         await tempWorkbook.xlsx.load(buffer);
-                        
                         const firstSheet = tempWorkbook.worksheets[0];
                         if (firstSheet) {
                             firstSheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-                                // 엑셀 행 데이터를 배열로 변환 (ExcelJS는 1-based index라 0번 비움 주의 -> values 속성 사용 시)
-                                // row.values는 [empty, col1, col2...] 형태일 수 있음
                                 const rowValues = [];
                                 row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-                                    rowValues[colNumber - 1] = cell.value; // 0-based array로 맞춤
+                                    rowValues[colNumber - 1] = cell.value;
                                 });
                                 rows.push(rowValues);
                             });
                         }
                     } else {
-                        // CSV 파일 처리
                         const text = await readFileAsText(file);
                         const parsed = Papa.parse(text, { skipEmptyLines: 'greedy' });
                         rows = parsed.data;
                     }
 
-                    // --- 데이터 추출 로직 (공통) ---
+                    // --- 데이터 추출 ---
                     let dataStartIndex = -1;
                     let headerRowIndex = -1;
                     let nameColIdx = 0;
                     let lossColIdx = -1;
 
-                    // 헤더 찾기 (Group Name이 있는 줄)
                     for (let r = 0; r < rows.length; r++) {
                         const row = rows[r];
                         for(let c = 0; c < row.length; c++) {
@@ -187,7 +180,6 @@
                             if (cellVal === "Group Name") {
                                 headerRowIndex = r;
                                 nameColIdx = c;
-                                // 같은 줄에서 "손절횟수" 찾기
                                 for(let k = 0; k < row.length; k++) {
                                     if (String(row[k] || "").trim() === "손절횟수") {
                                         lossColIdx = k;
@@ -206,7 +198,6 @@
                             const row = rows[r];
                             if (!row) continue;
                             
-                            // 값 추출 및 정제
                             const rawName = row[nameColIdx];
                             const rawLoss = row[lossColIdx];
 
@@ -214,7 +205,6 @@
                                 let nameStr = String(rawName).trim();
                                 let lossVal = 0;
 
-                                // 엑셀 셀 값이 객체(rich text 등)일 경우 처리
                                 if (typeof rawLoss === 'object' && rawLoss !== null) {
                                      lossVal = rawLoss.result || rawLoss.text || 0;
                                 } else {
@@ -222,29 +212,40 @@
                                 }
 
                                 if (nameStr) {
-                                    allSummaryData.push({
-                                        name: nameStr,
-                                        count: lossVal,
-                                        type: nameStr.includes('-') ? 'minus' : (nameStr.includes('+') ? 'plus' : 'other')
-                                    });
+                                    // Map에 병합 (기존 값 + 현재 값)
+                                    const currentCount = summaryMap.get(nameStr) || 0;
+                                    summaryMap.set(nameStr, currentCount + lossVal);
                                 }
                             }
                         }
                     }
 
-                    // --- 개별 시트 생성 (원본 데이터) ---
-                    let sheetName = file.name.replace(/\.[^/.]+$/, "").substring(0, 30); // 확장자 제거
+                    // --- 개별 시트 복사 ---
+                    let sheetName = file.name.replace(/\.[^/.]+$/, "").substring(0, 30);
                     if (workbook.getWorksheet(sheetName)) sheetName = `${sheetName}_${i}`;
-                    
                     const rawSheet = workbook.addWorksheet(sheetName);
                     rows.forEach(r => rawSheet.addRow(r));
                 }
 
-                // --- 요약 시트 채우기 및 스타일링 ---
-                const minusGroup = allSummaryData.filter(d => d.type === 'minus'); // 내림차순 정렬 제거 (요청사항 없음, 필요시 .sort((a,b)=>b.count-a.count) 추가)
-                const plusGroup = allSummaryData.filter(d => d.type === 'plus');
-                const otherGroup = allSummaryData.filter(d => d.type === 'other');
+                // --- 요약 데이터 정제 및 정렬 ---
+                // Map -> Array 변환 및 필터링 (0회 제외)
+                let allSummaryData = [];
+                summaryMap.forEach((count, name) => {
+                    if (count > 0) { // 0인 것 제외
+                        allSummaryData.push({
+                            name: name,
+                            count: count,
+                            type: name.includes('-') ? 'minus' : (name.includes('+') ? 'plus' : 'other')
+                        });
+                    }
+                });
 
+                // 분류 및 내림차순 정렬
+                const minusGroup = allSummaryData.filter(d => d.type === 'minus').sort((a, b) => b.count - a.count);
+                const plusGroup = allSummaryData.filter(d => d.type === 'plus').sort((a, b) => b.count - a.count);
+                const otherGroup = allSummaryData.filter(d => d.type === 'other').sort((a, b) => b.count - a.count);
+
+                // 시트 쓰기
                 let currentRow = 2;
 
                 // 1. Minus Group (-)
@@ -271,7 +272,6 @@
                             showValue: true, gradient: true
                         }]
                     });
-                    // 글자색
                     for(let r=minusStart; r<=minusEnd; r++) summarySheet.getCell(`A${r}`).font = { color: { argb: 'FFCC0000' } };
                 }
 
@@ -285,7 +285,6 @@
                             showValue: true, gradient: true
                         }]
                     });
-                    // 글자색
                     for(let r=plusStart; r<=plusEnd; r++) summarySheet.getCell(`A${r}`).font = { color: { argb: 'FF006600' } };
                 }
 
@@ -301,12 +300,11 @@
                     });
                 });
 
-                // 다운로드
                 const buffer = await workbook.xlsx.writeBuffer();
                 const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                saveAs(blob, '통계_종합_결과_Fixed.xlsx');
+                saveAs(blob, '통계_종합_결과_v2.xlsx');
                 
-                alert('완료되었습니다!');
+                alert('완료되었습니다! (0회 제외, 중복 병합 완료)');
 
             } catch (err) {
                 console.error(err);
