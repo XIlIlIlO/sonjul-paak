@@ -3,60 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading Statistics Merger</title>
+    <title>Trading Statistics Merger (Fixed)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     
     <style>
-        /* 드래그 앤 드롭 영역 스타일 */
-        .drop-zone {
-            transition: all 0.3s ease;
-        }
-        .drop-zone.drag-over {
-            background-color: #eff6ff;
-            border-color: #3b82f6;
-            transform: scale(1.02);
-        }
-        .file-list-item {
-            animation: fadeIn 0.3s ease;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        .drop-zone { transition: all 0.3s ease; }
+        .drop-zone.drag-over { background-color: #eff6ff; border-color: #3b82f6; transform: scale(1.02); }
+        .file-list-item { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans text-gray-700">
 
     <div class="max-w-4xl mx-auto p-8">
         <div class="text-center mb-10">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">📊 통계 엑셀 병합기</h1>
-            <p class="text-gray-500">여러 통계 파일을 업로드하면 요약 시트와 개별 시트로 정리해드립니다.</p>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">📊 통계 엑셀 병합기 (수정버전)</h1>
+            <p class="text-gray-500">엑셀(.xlsx)과 CSV 파일을 모두 정확하게 인식하여 병합합니다.</p>
         </div>
 
         <div class="bg-white rounded-xl shadow-lg p-8">
-            
             <div id="drop-zone" class="drop-zone border-2 border-dashed border-gray-300 rounded-xl p-10 text-center cursor-pointer hover:bg-gray-50 relative">
                 <input type="file" id="file-input" multiple accept=".csv,.xlsx,.xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                
                 <div class="flex flex-col items-center pointer-events-none">
                     <svg class="w-16 h-16 text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
                     <h3 class="text-lg font-semibold text-gray-700">여기를 클릭하거나 파일을 드래그하세요</h3>
-                    <p class="text-sm text-gray-400 mt-2">지원 형식: .csv, .xlsx (텍스트 기반)</p>
+                    <p class="text-sm text-gray-400 mt-2">.xlsx, .csv 파일 지원</p>
                 </div>
             </div>
 
             <div id="file-list-container" class="mt-8 hidden">
                 <h4 class="text-sm font-semibold text-gray-600 mb-3 flex justify-between items-center">
-                    <span>선택된 파일 목록 (<span id="file-count">0</span>개)</span>
+                    <span>선택된 파일 (<span id="file-count">0</span>개)</span>
                     <button onclick="clearFiles()" class="text-xs text-red-500 hover:text-red-700 underline">초기화</button>
                 </h4>
-                <div id="file-list" class="space-y-2 max-h-60 overflow-y-auto pr-2">
-                    </div>
+                <div id="file-list" class="space-y-2 max-h-60 overflow-y-auto pr-2"></div>
             </div>
 
             <div class="mt-8 pt-6 border-t border-gray-100 flex justify-end">
@@ -69,8 +54,7 @@
                 </button>
             </div>
         </div>
-        
-        <p class="text-center text-xs text-gray-400 mt-6">&copy; 2025 Trading Tool. All processing happens locally in your browser.</p>
+        <p class="text-center text-xs text-gray-400 mt-6">&copy; 2025 Trading Tool. All processing happens locally.</p>
     </div>
 
     <script>
@@ -84,60 +68,33 @@
         const btnText = document.getElementById('btn-text');
         const loadingSpinner = document.getElementById('loading-spinner');
 
-        // 드래그 앤 드롭 이벤트 처리
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('drag-over');
-        });
-
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('drag-over');
-        });
-
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('drag-over');
-            handleFiles(e.dataTransfer.files);
-        });
-
-        fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files);
-        });
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('drag-over'); });
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
+        fileInput.addEventListener('change', (e) => { handleFiles(e.target.files); });
 
         function handleFiles(files) {
             if (!files.length) return;
-            
-            // 기존 파일 배열에 추가
             selectedFiles = [...selectedFiles, ...Array.from(files)];
             updateFileList();
         }
 
         function clearFiles() {
             selectedFiles = [];
-            fileInput.value = ''; // input 초기화
+            fileInput.value = '';
             updateFileList();
         }
 
         function updateFileList() {
             fileList.innerHTML = '';
             fileCountSpan.textContent = selectedFiles.length;
-
             if (selectedFiles.length > 0) {
                 fileListContainer.classList.remove('hidden');
                 processBtn.disabled = false;
-                
-                selectedFiles.forEach((file, index) => {
+                selectedFiles.forEach(file => {
                     const div = document.createElement('div');
                     div.className = 'file-list-item flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200';
-                    div.innerHTML = `
-                        <div class="flex items-center space-x-3 overflow-hidden">
-                            <div class="bg-green-100 p-2 rounded text-green-600">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                            </div>
-                            <span class="text-sm font-medium text-gray-700 truncate">${file.name}</span>
-                        </div>
-                        <span class="text-xs text-gray-400 whitespace-nowrap">${(file.size / 1024).toFixed(1)} KB</span>
-                    `;
+                    div.innerHTML = `<span class="text-sm font-medium text-gray-700 truncate">${file.name}</span><span class="text-xs text-gray-400 whitespace-nowrap">${(file.size/1024).toFixed(1)} KB</span>`;
                     fileList.appendChild(div);
                 });
             } else {
@@ -146,206 +103,194 @@
             }
         }
 
-        // CSV/Text 파일 읽기 헬퍼 함수
+        // 파일 읽기 유틸리티
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(e);
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
         function readFileAsText(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = (e) => resolve(e.target.result);
                 reader.onerror = (e) => reject(e);
-                reader.readAsText(file, 'UTF-8'); // 한글 인코딩 이슈가 있다면 EUC-KR로 변경 고려
+                reader.readAsText(file, 'UTF-8');
             });
         }
 
         async function processFiles() {
             if (selectedFiles.length === 0) return;
-
-            // 로딩 상태 표시
             processBtn.disabled = true;
             btnText.textContent = "처리 중...";
             loadingSpinner.classList.remove('hidden');
 
             try {
-                // ExcelJS 워크북 생성
                 const workbook = new ExcelJS.Workbook();
-                workbook.creator = 'Trading Tool';
-                workbook.created = new Date();
-
-                // 1. 요약 시트 생성 (맨 앞)
                 const summarySheet = workbook.addWorksheet('손절요약시트');
                 summarySheet.columns = [
                     { header: 'Group Name', key: 'name', width: 30 },
-                    { header: '손절횟수', key: 'lossCount', width: 25 },
+                    { header: '손절횟수', key: 'lossCount', width: 15 },
                 ];
                 
-                // 요약 시트 헤더 스타일
                 const headerRow = summarySheet.getRow(1);
-                headerRow.font = { bold: true, size: 12 };
+                headerRow.font = { bold: true };
                 headerRow.alignment = { horizontal: 'center' };
-                headerRow.fill = {
-                    type: 'pattern',
-                    pattern: 'solid',
-                    fgColor: { argb: 'FFEFEFEF' }
-                };
+                headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
 
                 let allSummaryData = [];
 
-                // 2. 파일 순회 및 처리
                 for (let i = 0; i < selectedFiles.length; i++) {
                     const file = selectedFiles[i];
-                    const csvContent = await readFileAsText(file);
-                    
-                    // PapaParse로 CSV 파싱
-                    const parsed = Papa.parse(csvContent, {
-                        skipEmptyLines: 'greedy', // 빈 줄 건너뛰기
-                        header: false // 헤더 자동 감지 안함 (구조가 복잡하므로)
-                    });
+                    let rows = [];
 
-                    const rows = parsed.data;
-                    
-                    // "Group Name"이 시작되는 행 찾기
-                    let dataStartIndex = -1;
-                    let headerRowIndex = -1;
-
-                    for (let r = 0; r < rows.length; r++) {
-                        // 첫 번째 컬럼이 "Group Name"인 행 찾기
-                        if (rows[r][0] && rows[r][0].trim() === "Group Name") {
-                            headerRowIndex = r;
-                            dataStartIndex = r + 1;
-                            break;
+                    // 파일 타입에 따른 처리 분기
+                    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                        // 엑셀 파일 처리
+                        const buffer = await readFileAsArrayBuffer(file);
+                        const tempWorkbook = new ExcelJS.Workbook();
+                        await tempWorkbook.xlsx.load(buffer);
+                        
+                        const firstSheet = tempWorkbook.worksheets[0];
+                        if (firstSheet) {
+                            firstSheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+                                // 엑셀 행 데이터를 배열로 변환 (ExcelJS는 1-based index라 0번 비움 주의 -> values 속성 사용 시)
+                                // row.values는 [empty, col1, col2...] 형태일 수 있음
+                                const rowValues = [];
+                                row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                                    rowValues[colNumber - 1] = cell.value; // 0-based array로 맞춤
+                                });
+                                rows.push(rowValues);
+                            });
                         }
+                    } else {
+                        // CSV 파일 처리
+                        const text = await readFileAsText(file);
+                        const parsed = Papa.parse(text, { skipEmptyLines: 'greedy' });
+                        rows = parsed.data;
                     }
 
-                    if (dataStartIndex !== -1) {
-                        // 헤더에서 "손절횟수" 컬럼 인덱스 찾기
-                        const headers = rows[headerRowIndex];
-                        let lossCountIdx = -1;
-                        
-                        headers.forEach((h, idx) => {
-                            if (h && h.trim() === "손절횟수") lossCountIdx = idx;
-                        });
+                    // --- 데이터 추출 로직 (공통) ---
+                    let dataStartIndex = -1;
+                    let headerRowIndex = -1;
+                    let nameColIdx = 0;
+                    let lossColIdx = -1;
 
-                        // 데이터 추출하여 요약 리스트에 추가
-                        if (lossCountIdx !== -1) {
-                            for (let r = dataStartIndex; r < rows.length; r++) {
-                                const row = rows[r];
-                                if (row.length > lossCountIdx) {
-                                    const groupName = row[0];
-                                    // 숫자로 변환, 없으면 0
-                                    const lossCount = parseInt(row[lossCountIdx]) || 0; 
-                                    
-                                    if(groupName) {
-                                        allSummaryData.push({
-                                            name: groupName,
-                                            count: lossCount,
-                                            type: groupName.includes('-') ? 'minus' : (groupName.includes('+') ? 'plus' : 'other')
-                                        });
+                    // 헤더 찾기 (Group Name이 있는 줄)
+                    for (let r = 0; r < rows.length; r++) {
+                        const row = rows[r];
+                        for(let c = 0; c < row.length; c++) {
+                            const cellVal = String(row[c] || "").trim();
+                            if (cellVal === "Group Name") {
+                                headerRowIndex = r;
+                                nameColIdx = c;
+                                // 같은 줄에서 "손절횟수" 찾기
+                                for(let k = 0; k < row.length; k++) {
+                                    if (String(row[k] || "").trim() === "손절횟수") {
+                                        lossColIdx = k;
+                                        break;
                                     }
+                                }
+                                break;
+                            }
+                        }
+                        if (headerRowIndex !== -1) break;
+                    }
+
+                    if (headerRowIndex !== -1 && lossColIdx !== -1) {
+                        dataStartIndex = headerRowIndex + 1;
+                        for (let r = dataStartIndex; r < rows.length; r++) {
+                            const row = rows[r];
+                            if (!row) continue;
+                            
+                            // 값 추출 및 정제
+                            const rawName = row[nameColIdx];
+                            const rawLoss = row[lossColIdx];
+
+                            if (rawName) {
+                                let nameStr = String(rawName).trim();
+                                let lossVal = 0;
+
+                                // 엑셀 셀 값이 객체(rich text 등)일 경우 처리
+                                if (typeof rawLoss === 'object' && rawLoss !== null) {
+                                     lossVal = rawLoss.result || rawLoss.text || 0;
+                                } else {
+                                     lossVal = parseInt(rawLoss) || 0;
+                                }
+
+                                if (nameStr) {
+                                    allSummaryData.push({
+                                        name: nameStr,
+                                        count: lossVal,
+                                        type: nameStr.includes('-') ? 'minus' : (nameStr.includes('+') ? 'plus' : 'other')
+                                    });
                                 }
                             }
                         }
                     }
 
-                    // 3. 개별 파일 내용을 담을 시트 생성 (Sheet 2, 3...)
-                    // 시트 이름이 중복되지 않게 처리, 너무 길면 자름
-                    let sheetName = file.name.replace('.csv', '').replace('.xlsx', '').substring(0, 30);
-                    // 이미 있으면 번호 붙이기
-                    if (workbook.getWorksheet(sheetName)) {
-                        sheetName = `${sheetName}_${i+1}`;
-                    }
-                    const rawSheet = workbook.addWorksheet(sheetName);
+                    // --- 개별 시트 생성 (원본 데이터) ---
+                    let sheetName = file.name.replace(/\.[^/.]+$/, "").substring(0, 30); // 확장자 제거
+                    if (workbook.getWorksheet(sheetName)) sheetName = `${sheetName}_${i}`;
                     
-                    // CSV 데이터를 그대로 쓰기
-                    rows.forEach(row => {
-                        rawSheet.addRow(row);
-                    });
+                    const rawSheet = workbook.addWorksheet(sheetName);
+                    rows.forEach(r => rawSheet.addRow(r));
                 }
 
-                // 4. 요약 데이터 정렬 및 시트에 쓰기
-                // 정렬 로직: '-' 그룹 먼저, 그 다음 '+' 그룹. (각 그룹 내에서는 손절횟수 내림차순? 요청엔 없지만 보기 좋게)
-                // 요청: "빨간색, 초록색 형식 참고... 오른쪽으로 길이 조절" -> DataBar 적용을 위해 그룹화 필수
-                
-                const minusGroup = allSummaryData.filter(d => d.type === 'minus');
+                // --- 요약 시트 채우기 및 스타일링 ---
+                const minusGroup = allSummaryData.filter(d => d.type === 'minus'); // 내림차순 정렬 제거 (요청사항 없음, 필요시 .sort((a,b)=>b.count-a.count) 추가)
                 const plusGroup = allSummaryData.filter(d => d.type === 'plus');
                 const otherGroup = allSummaryData.filter(d => d.type === 'other');
 
-                // 각각 쓰기
-                let currentRowIdx = 2; // 1번은 헤더
-                
-                // Minus Group (-) 쓰기
-                const minusStartRow = currentRowIdx;
-                minusGroup.forEach(d => {
-                    summarySheet.addRow([d.name, d.count]);
-                    currentRowIdx++;
-                });
-                const minusEndRow = currentRowIdx - 1;
+                let currentRow = 2;
 
-                // Plus Group (+) 쓰기
-                const plusStartRow = currentRowIdx;
-                plusGroup.forEach(d => {
-                    summarySheet.addRow([d.name, d.count]);
-                    currentRowIdx++;
-                });
-                const plusEndRow = currentRowIdx - 1;
+                // 1. Minus Group (-)
+                const minusStart = currentRow;
+                minusGroup.forEach(d => { summarySheet.addRow([d.name, d.count]); currentRow++; });
+                const minusEnd = currentRow - 1;
 
-                // Others (if any)
-                otherGroup.forEach(d => {
-                    summarySheet.addRow([d.name, d.count]);
-                    currentRowIdx++;
-                });
+                // 2. Plus Group (+)
+                const plusStart = currentRow;
+                plusGroup.forEach(d => { summarySheet.addRow([d.name, d.count]); currentRow++; });
+                const plusEnd = currentRow - 1;
 
-                // 5. 조건부 서식 적용 (Data Bar)
-                // ExcelJS에서 Data Bar는 cfvo(Conditional Format Value Object)를 사용합니다.
-                
-                // (-) 그룹: 빨간색 바 (Red)
-                if (minusGroup.length > 0) {
+                // 3. Others
+                otherGroup.forEach(d => { summarySheet.addRow([d.name, d.count]); currentRow++; });
+
+                // 조건부 서식 (Data Bar)
+                if (minusStart <= minusEnd) {
                     summarySheet.addConditionalFormatting({
-                        ref: `B${minusStartRow}:B${minusEndRow}`,
-                        rules: [
-                            {
-                                type: 'dataBar',
-                                cfvo: [
-                                    { type: 'min', value: 0 },
-                                    { type: 'max' } // 자동 최대값
-                                ],
-                                color: { argb: 'FFFF6B6B' }, // 연한 빨강 (막대 색)
-                                showValue: true,
-                                gradient: true // 그라데이션 (찐한색 -> 옅은색 효과)
-                            }
-                        ]
+                        ref: `B${minusStart}:B${minusEnd}`,
+                        rules: [{
+                            type: 'dataBar',
+                            cfvo: [{ type: 'min', value: 0 }, { type: 'max' }],
+                            color: { argb: 'FFFF6B6B' }, // Red
+                            showValue: true, gradient: true
+                        }]
                     });
-                    
-                    // 텍스트 색상도 약간 붉게 처리 (옵션)
-                    for(let r=minusStartRow; r<=minusEndRow; r++) {
-                         summarySheet.getCell(`A${r}`).font = { color: { argb: 'FFCC0000' } };
-                    }
+                    // 글자색
+                    for(let r=minusStart; r<=minusEnd; r++) summarySheet.getCell(`A${r}`).font = { color: { argb: 'FFCC0000' } };
                 }
 
-                // (+) 그룹: 초록색 바 (Green)
-                if (plusGroup.length > 0) {
+                if (plusStart <= plusEnd) {
                     summarySheet.addConditionalFormatting({
-                        ref: `B${plusStartRow}:B${plusEndRow}`,
-                        rules: [
-                            {
-                                type: 'dataBar',
-                                cfvo: [
-                                    { type: 'min', value: 0 },
-                                    { type: 'max' }
-                                ],
-                                color: { argb: 'FF6BFF8E' }, // 연한 초록
-                                showValue: true,
-                                gradient: true
-                            }
-                        ]
+                        ref: `B${plusStart}:B${plusEnd}`,
+                        rules: [{
+                            type: 'dataBar',
+                            cfvo: [{ type: 'min', value: 0 }, { type: 'max' }],
+                            color: { argb: 'FF6BFF8E' }, // Green
+                            showValue: true, gradient: true
+                        }]
                     });
-                    
-                    // 텍스트 색상도 약간 초록으로 처리
-                    for(let r=plusStartRow; r<=plusEndRow; r++) {
-                         summarySheet.getCell(`A${r}`).font = { color: { argb: 'FF006600' } };
-                    }
+                    // 글자색
+                    for(let r=plusStart; r<=plusEnd; r++) summarySheet.getCell(`A${r}`).font = { color: { argb: 'FF006600' } };
                 }
 
-                // 테두리 스타일링 (전체)
-                summarySheet.eachRow((row, rowNumber) => {
+                // 테두리
+                summarySheet.eachRow((row) => {
                     row.eachCell((cell) => {
                         cell.border = {
                             top: {style:'thin', color: {argb:'FFCCCCCC'}},
@@ -356,17 +301,16 @@
                     });
                 });
 
-                // 6. 파일 다운로드 트리거
+                // 다운로드
                 const buffer = await workbook.xlsx.writeBuffer();
                 const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                saveAs(blob, '통계_종합_결과.xlsx');
+                saveAs(blob, '통계_종합_결과_Fixed.xlsx');
+                
+                alert('완료되었습니다!');
 
-                // 완료 상태 복구
-                alert('파일 처리가 완료되었습니다!');
-
-            } catch (error) {
-                console.error(error);
-                alert('파일 처리 중 오류가 발생했습니다: ' + error.message);
+            } catch (err) {
+                console.error(err);
+                alert('오류 발생: ' + err.message);
             } finally {
                 processBtn.disabled = false;
                 btnText.textContent = "엑셀 병합 및 다운로드";
